@@ -61,3 +61,21 @@ A production-ready, feature-rich Telegram Music Bot with Voice Chat support, mul
 ```bash
 git clone https://github.com/yourusername/music-bot.git
 cd music-bot
+```
+2. **Install dependencies**
+```bash
+pip install -r requirements.txt
+```
+3. **Configure environment**
+```bash
+cp .env.example .env
+# Edit .env with your credentials
+```
+4. **Generate String Session (for Voice Chat)**
+```bash
+python start_session.py
+```
+5. **Run the bot**
+```bash
+python bot.py
+```
