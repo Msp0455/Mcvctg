@@ -1,9 +1,13 @@
-FROM python:3.10-slim
+# Multi-stage build for smaller image
+FROM python:3.10-slim AS builder
 
 WORKDIR /app
 
-# Install system dependencies
+# Install build dependencies
 RUN apt-get update && apt-get install -y \
+    gcc \
+    g++ \
+    python3-dev \
     ffmpeg \
     curl \
     git \
@@ -13,24 +17,46 @@ RUN apt-get update && apt-get install -y \
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip && \
+    pip install --user --no-cache-dir -r requirements.txt
 
-# Copy application
-COPY . .
+# Runtime stage
+FROM python:3.10-slim AS runtime
 
-# Create directories
-RUN mkdir -p logs cache downloads
+WORKDIR /app
 
-# Set environment variables
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ffmpeg \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create non-root user
+RUN useradd -m -u 1000 -s /bin/bash appuser
+
+# Copy Python dependencies from builder
+COPY --from=builder /root/.local /home/appuser/.local
+
+# Copy application code
+COPY --chown=appuser:appuser . .
+
+# Switch to non-root user
+USER appuser
+
+# Add local bin to PATH
+ENV PATH="/home/appuser/.local/bin:$PATH"
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Expose port
-EXPOSE 8080
+# Create necessary directories
+RUN mkdir -p logs cache downloads
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose port
+EXPOSE 8080
 
 # Run the application
 CMD ["sh", "-c", "python bot.py & gunicorn app:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120"]
