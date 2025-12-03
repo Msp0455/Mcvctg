@@ -97,3 +97,8 @@ pip install TgCrypto==1.2.5
 # .env file me
 AUDIO_QUALITY=192k  # Ya "HIGH" ki jagah "192k"
 ```
+
+9. **run**
+```bash
+python bot_simple.py
+```
