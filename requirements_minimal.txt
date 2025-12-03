@@ -1,0 +1,23 @@
+# Core Telegram
+pyrogram==2.0.106
+py-tgcalls==2.2.8
+
+# Music & Audio
+yt-dlp==2023.11.16
+pydub==0.25.1
+
+# APIs
+google-api-python-client==2.108.0
+spotipy==2.23.0
+lyricsgenius==3.0.1
+pylast==5.1.0
+
+# Database
+motor==3.3.2
+redis==5.0.1
+
+# Utilities
+python-dotenv==1.0.0
+requests==2.31.0
+aiohttp==3.9.1
+aiofiles==23.2.1
