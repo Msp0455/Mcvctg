@@ -88,3 +88,12 @@ pip install py-tgcalls==2.2.8
 ```bash
 python -c "import pytgcalls; print(f'PyTgCalls version: {pytgcalls.__version__}')"
 ```
+8. **TgCrypto install karo**
+```bash
+pip install TgCrypto==1.2.5
+```
+9. **Environment variable fix**
+```bash
+# .env file me
+AUDIO_QUALITY=192k  # Ya "HIGH" ki jagah "192k"
+```
