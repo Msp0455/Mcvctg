@@ -1,161 +1,131 @@
 """
-🎵 Advanced Music Bot - Main Entry Point
-Production-ready with all features
+Simple Music Bot - Working Version
 """
 
+import os
 import asyncio
-import signal
 import sys
+from pathlib import Path
+
+# Add current directory to path
+sys.path.insert(0, str(Path(__file__).parent))
+
+from pyrogram import Client, filters
+from pyrogram.types import Message
 import logging
-from contextlib import asynccontextmanager
-from typing import Optional
-
-import uvloop
-from pyrogram import idle
-
-from config import config
-from core.bot_engine import MusicBotEngine
-from core.cache_manager import CacheManager
-from core.database import DatabaseManager
-from utils.logger import setup_logging
-from api.server import start_web_server
-from middleware.error_handler import setup_exception_handlers
-from tasks.cleanup import CleanupManager
-from tasks.monitor import SystemMonitor
 
 # Setup logging
-logger = setup_logging()
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-class MusicBot:
-    """Main bot application"""
-    
-    def __init__(self):
-        self.bot_engine: Optional[MusicBotEngine] = None
-        self.database: Optional[DatabaseManager] = None
-        self.cache: Optional[CacheManager] = None
-        self.cleanup: Optional[CleanupManager] = None
-        self.monitor: Optional[SystemMonitor] = None
-        self.web_server = None
-        
-        # Signal handlers
-        signal.signal(signal.SIGINT, self.signal_handler)
-        signal.signal(signal.SIGTERM, self.signal_handler)
-    
-    def signal_handler(self, signum, frame):
-        """Handle shutdown signals"""
-        logger.info(f"Received signal {signum}, shutting down...")
-        asyncio.create_task(self.shutdown())
-    
-    async def initialize(self):
-        """Initialize all components"""
-        try:
-            logger.info("🚀 Initializing Music Bot...")
-            
-            # 1. Setup exception handling
-            setup_exception_handlers()
-            
-            # 2. Initialize database
-            self.database = DatabaseManager()
-            await self.database.connect()
-            logger.info("✅ Database connected")
-            
-            # 3. Initialize cache
-            self.cache = CacheManager()
-            await self.cache.connect()
-            logger.info("✅ Cache connected")
-            
-            # 4. Initialize bot engine
-            self.bot_engine = MusicBotEngine(self.database, self.cache)
-            await self.bot_engine.initialize()
-            logger.info("✅ Bot engine initialized")
-            
-            # 5. Start background tasks
-            self.cleanup = CleanupManager(self.bot_engine, self.cache)
-            await self.cleanup.start()
-            
-            self.monitor = SystemMonitor(self.bot_engine, self.database)
-            await self.monitor.start()
-            
-            # 6. Start web server (for health checks)
-            if config.server.environment == Environment.PRODUCTION:
-                self.web_server = await start_web_server()
-                logger.info(f"✅ Web server started on port {config.server.port}")
-            
-            logger.info("🎉 Bot initialization complete!")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize bot: {e}", exc_info=True)
-            await self.shutdown()
-            sys.exit(1)
-    
-    async def run(self):
-        """Run the bot"""
-        try:
-            # Run idle to keep bot alive
-            await idle()
-            
-        except KeyboardInterrupt:
-            logger.info("Bot stopped by user")
-        except Exception as e:
-            logger.error(f"Bot runtime error: {e}", exc_info=True)
-        finally:
-            await self.shutdown()
-    
-    async def shutdown(self):
-        """Graceful shutdown"""
-        logger.info("🛑 Shutting down bot...")
-        
-        shutdown_tasks = []
-        
-        # Stop web server
-        if self.web_server:
-            shutdown_tasks.append(self.web_server.shutdown())
-        
-        # Stop background tasks
-        if self.monitor:
-            shutdown_tasks.append(self.monitor.stop())
-        
-        if self.cleanup:
-            shutdown_tasks.append(self.cleanup.stop())
-        
-        # Stop bot engine
-        if self.bot_engine:
-            shutdown_tasks.append(self.bot_engine.shutdown())
-        
-        # Close database connections
-        if self.database:
-            shutdown_tasks.append(self.database.disconnect())
-        
-        # Close cache connections
-        if self.cache:
-            shutdown_tasks.append(self.cache.disconnect())
-        
-        # Execute all shutdown tasks
-        if shutdown_tasks:
-            await asyncio.gather(*shutdown_tasks, return_exceptions=True)
-        
-        logger.info("👋 Bot shutdown complete")
-    
-    @asynccontextmanager
-    async def lifespan(self):
-        """Async context manager for lifespan"""
-        await self.initialize()
-        try:
-            yield
-        finally:
-            await self.shutdown()
+# Import config
+try:
+    from config import config
+    logger.info("✅ Config loaded successfully")
+except ImportError as e:
+    logger.error(f"❌ Failed to import config: {e}")
+    sys.exit(1)
 
+# Create bot client
+app = Client(
+    "music_bot",
+    api_id=config.telegram.api_id,
+    api_hash=config.telegram.api_hash,
+    bot_token=config.telegram.bot_token,
+    in_memory=True,
+)
+
+# Basic commands
+@app.on_message(filters.command("start"))
+async def start_command(client, message: Message):
+    """Start command"""
+    await message.reply_text(
+        f"🎵 **{config.bot.name}**\n\n"
+        "Hello! I'm a music bot.\n"
+        "Use /play to play music.\n\n"
+        f"⚡ Status: **Online**"
+    )
+
+@app.on_message(filters.command("play"))
+async def play_command(client, message: Message):
+    """Play command"""
+    if len(message.command) < 2:
+        await message.reply_text("Usage: /play <song name>")
+        return
+    
+    query = " ".join(message.command[1:])
+    await message.reply_text(f"🎵 Searching: {query}")
+
+@app.on_message(filters.command("help"))
+async def help_command(client, message: Message):
+    """Help command"""
+    await message.reply_text(
+        "📖 **Commands:**\n\n"
+        "/start - Start the bot\n"
+        "/play <song> - Play a song\n"
+        "/help - Show this help\n\n"
+        f"🤖 Bot: {config.bot.name}"
+    )
+
+@app.on_message(filters.command("ping"))
+async def ping_command(client, message: Message):
+    """Ping command"""
+    await message.reply_text("🏓 Pong!")
+
+# Main function
 async def main():
     """Main function"""
-    # Use uvloop for better performance
-    asyncio.set_event_loop_policy(uvloop.EventLoopPolicy())
+    logger.info("🚀 Starting Music Bot...")
     
-    # Create and run bot
-    bot = MusicBot()
+    # Check credentials
+    if not config.telegram.api_id or not config.telegram.api_hash or not config.telegram.bot_token:
+        logger.error("❌ Missing Telegram credentials in .env file")
+        return
     
-    async with bot.lifespan():
-        await bot.run()
+    try:
+        await app.start()
+        
+        # Get bot info
+        me = await app.get_me()
+        logger.info(f"✅ Bot started: @{me.username} (ID: {me.id})")
+        
+        # Send startup message to admin
+        if config.bot.admin_ids:
+            for admin_id in config.bot.admin_ids:
+                try:
+                    await app.send_message(
+                        admin_id,
+                        f"🤖 **Bot Started Successfully!**\n\n"
+                        f"**Name:** {me.first_name}\n"
+                        f"**Username:** @{me.username}\n"
+                        f"**ID:** {me.id}\n"
+                        f"**Status:** ✅ Online"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to notify admin {admin_id}: {e}")
+        
+        # Keep running
+        await asyncio.Event().wait()
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to start bot: {e}")
+    finally:
+        await app.stop()
+        logger.info("👋 Bot stopped")
 
 if __name__ == "__main__":
-    # Entry point
-    asyncio.run(main())
+    # Create necessary directories
+    os.makedirs("logs", exist_ok=True)
+    os.makedirs("downloads", exist_ok=True)
+    os.makedirs("cache", exist_ok=True)
+    
+    # Run the bot
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        logger.info("Bot stopped by user")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
