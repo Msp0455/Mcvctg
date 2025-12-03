@@ -1,0 +1,181 @@
+version: '3.8'
+
+services:
+  # MongoDB Database
+  mongodb:
+    image: mongo:6
+    container_name: music_bot_mongo
+    restart: unless-stopped
+    volumes:
+      - mongodb_data:/data/db
+      - ./docker/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:-password}
+      MONGO_INITDB_DATABASE: ${MONGO_INITDB_DATABASE:-music_bot}
+    ports:
+      - "27017:27017"
+    networks:
+      - music_bot_network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: music_bot_redis
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - music_bot_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Bot Application
+  bot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: music_bot
+    restart: unless-stopped
+    depends_on:
+      mongodb:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      # Telegram
+      - API_ID=${API_ID}
+      - API_HASH=${API_HASH}
+      - BOT_TOKEN=${BOT_TOKEN}
+      - STRING_SESSION=${STRING_SESSION}
+      
+      # APIs
+      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
+      - SPOTIFY_CLIENT_ID=${SPOTIFY_CLIENT_ID}
+      - SPOTIFY_CLIENT_SECRET=${SPOTIFY_CLIENT_SECRET}
+      - GENIUS_ACCESS_TOKEN=${GENIUS_ACCESS_TOKEN}
+      - LASTFM_API_KEY=${LASTFM_API_KEY}
+      - LASTFM_API_SECRET=${LASTFM_API_SECRET}
+      
+      # Database
+      - MONGODB_URI=mongodb://${MONGO_INITDB_ROOT_USERNAME:-admin}:${MONGO_INITDB_ROOT_PASSWORD:-password}@mongodb:27017/${MONGO_INITDB_DATABASE:-music_bot}?authSource=admin
+      - REDIS_URL=redis://redis:6379/0
+      
+      # Bot Settings
+      - ADMIN_IDS=${ADMIN_IDS}
+      - BOT_NAME=${BOT_NAME:-🎵 Music Bot}
+      - BOT_USERNAME=${BOT_USERNAME}
+      - LOG_CHANNEL=${LOG_CHANNEL}
+      - SUPPORT_CHAT=${SUPPORT_CHAT}
+      
+      # Server
+      - ENVIRONMENT=${ENVIRONMENT:-production}
+      - PORT=${PORT:-8080}
+      - DEBUG=${DEBUG:-false}
+      
+      # Performance
+      - WORKERS=${WORKERS:-10}
+      - MAX_DOWNLOAD_SIZE=${MAX_DOWNLOAD_SIZE:-52428800}
+      - AUDIO_QUALITY=${AUDIO_QUALITY:-HIGH}
+      
+      # Monitoring
+      - SENTRY_DSN=${SENTRY_DSN}
+    volumes:
+      - ./logs:/app/logs
+      - ./downloads:/app/downloads
+      - ./cache:/app/cache
+    ports:
+      - "${PORT:-8080}:8080"
+    networks:
+      - music_bot_network
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.music-bot.rule=Host(`music-bot.yourdomain.com`)"
+      - "traefik.http.routers.music-bot.entrypoints=websecure"
+      - "traefik.http.routers.music-bot.tls.certresolver=myresolver"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Prometheus Monitoring (Optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: music_bot_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./docker/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - music_bot_network
+
+  # Grafana Dashboard (Optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: music_bot_grafana
+    restart: unless-stopped
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./docker/grafana-dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml
+      - ./docker/grafana-datasource.yml:/etc/grafana/provisioning/datasources/datasource.yml
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+    ports:
+      - "3000:3000"
+    networks:
+      - music_bot_network
+
+  # Traefik Reverse Proxy (Optional)
+  traefik:
+    image: traefik:v2.10
+    container_name: music_bot_traefik
+    restart: unless-stopped
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      - "--certificatesresolvers.myresolver.acme.email=${ACME_EMAIL}"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8081:8080"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "./letsencrypt:/letsencrypt"
+    networks:
+      - music_bot_network
+
+networks:
+  music_bot_network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
