@@ -1,7 +1,7 @@
 # Telegram
 pyrogram==2.0.106
 telethon==1.34.0
-py-tgcalls==2.2.8  # Latest stable version
+py-tgcalls==2.2.8  # Latest stable
 
 # Web Framework
 fastapi==0.104.1
@@ -9,7 +9,7 @@ uvicorn[standard]==0.24.0
 gunicorn==21.2.0
 
 # Music & Audio
-yt-dlp==2023.11.16  # Updated
+yt-dlp==2023.11.16
 pydub==0.25.1
 ffmpeg-python==0.2.0
 mutagen==1.47.0
@@ -25,30 +25,23 @@ pylast==5.1.0
 motor==3.3.2
 pymongo[srv]==4.5.0
 redis==5.0.1
-sqlalchemy==2.0.23
 aiosqlite==0.19.0
 
-# Utilities
-aiohttp==3.9.1
-aiofiles==23.2.1
-Pillow==10.1.0
-python-dotenv==1.0.0
-requests==2.31.0
-cachetools==5.3.2
-python-multipart==0.0.6
+# Utilities - VERSION LOOSEN KAR DIYA
+aiohttp>=3.9.3  # Changed from 3.9.1 to >=3.9.3
+aiofiles>=23.2.1
+Pillow>=10.1.0
+python-dotenv>=1.0.0
+requests>=2.31.0
+cachetools>=5.3.2
+python-multipart>=0.0.6
 
 # Monitoring & Logging
-prometheus-client==0.19.0
-sentry-sdk==1.40.0
-structlog==23.2.0
+prometheus-client>=0.19.0
+sentry-sdk>=1.40.0
+structlog>=23.2.0
 
 # Security
-cryptography==41.0.7
-bcrypt==4.1.2
-passlib==1.7.4
-
-# Development
-black==23.11.0
-isort==5.12.0
-pytest==7.4.3
-pytest-asyncio==0.21.1
+cryptography>=41.0.7
+bcrypt>=4.1.2
+passlib>=1.7.4
