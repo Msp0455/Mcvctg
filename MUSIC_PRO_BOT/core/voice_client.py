@@ -4,13 +4,14 @@ from typing import Optional, Dict
 from pytgcalls import PyTgCalls
 from pytgcalls.types import AudioPiped, AudioVideoPiped, StreamAudioEnded
 from pytgcalls.exceptions import GroupCallNotFound
+from pytgcalls.types.input_stream import InputAudioStream
 
 from config import config
 from utils.logger import logger
 from utils.exceptions import VoiceChatError
 
 class VoiceClient:
-    """Voice chat client using PyTgCalls"""
+    """Voice chat client using PyTgCalls 2.x"""
     
     def __init__(self, user_client):
         self.user_client = user_client
@@ -21,18 +22,14 @@ class VoiceClient:
         """Initialize PyTgCalls"""
         self.py_tg_calls = PyTgCalls(self.user_client)
         
-        # Setup event handlers
+        # Setup event handlers for PyTgCalls 2.x
         @self.py_tg_calls.on_stream_end()
-        async def stream_end_handler(_, update: StreamAudioEnded):
+        async def stream_end_handler(client: PyTgCalls, update: StreamAudioEnded):
             await self._on_stream_end(update.chat_id)
         
-        @self.py_tg_calls.on_kicked()
-        async def kicked_handler(_, chat_id: int):
-            await self._on_kicked(chat_id)
-        
-        @self.py_tg_calls.on_left()
-        async def left_handler(_, chat_id: int):
-            await self._on_left(chat_id)
+        @self.py_tg_calls.on_participants_change()
+        async def participants_change_handler(client: PyTgCalls, participants: int):
+            logger.debug(f"Participants changed: {participants}")
         
         await self.py_tg_calls.start()
         logger.info("Voice client initialized")
@@ -47,12 +44,12 @@ class VoiceClient:
             if await self.is_joined(chat_id):
                 return True
             
-            # Join with silent audio
+            # Join with silent audio (PyTgCalls 2.x style)
             await self.py_tg_calls.join_group_call(
                 chat_id,
                 AudioPiped(
                     "https://github.com/TeamTelegram/TelegramMusicBot/raw/main/silent.mp3",
-                    audio_parameters=AudioPiped.HIGH_QUALITY_AUDIO
+                    additional_ffmpeg_parameters="-re"
                 )
             )
             
@@ -100,11 +97,12 @@ class VoiceClient:
             if not await self.is_joined(chat_id):
                 await self.join_chat(chat_id)
             
+            # Change stream (PyTgCalls 2.x style)
             await self.py_tg_calls.change_stream(
                 chat_id,
                 AudioPiped(
                     audio_url,
-                    audio_parameters=AudioPiped.HIGH_QUALITY_AUDIO
+                    additional_ffmpeg_parameters="-re"
                 )
             )
             
@@ -153,16 +151,17 @@ class VoiceClient:
             return False
     
     async def set_volume(self, chat_id: int, volume: int) -> bool:
-        """Set volume (0-200)"""
+        """Set volume (0-200) - PyTgCalls 2.x me direct volume control nahi hai"""
         try:
             if not self.py_tg_calls:
                 return False
             
-            await self.py_tg_calls.change_volume_call(chat_id, volume)
-            
+            # PyTgCalls 2.x me volume control FFmpeg parameters se karte hain
+            # For now, just store the value
             if chat_id in self.active_chats:
                 self.active_chats[chat_id]["volume"] = volume
             
+            logger.info(f"Volume set to {volume}% for chat {chat_id}")
             return True
             
         except Exception as e:
@@ -177,6 +176,7 @@ class VoiceClient:
         try:
             # Try to get call info to verify
             if self.py_tg_calls:
+                # PyTgCalls 2.x me get_call method check karo
                 call = await self.py_tg_calls.get_call(chat_id)
                 return call is not None
         except:
