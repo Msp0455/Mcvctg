@@ -1,62 +1,43 @@
-# Multi-stage build for smaller image
-FROM python:3.10-slim AS builder
+# Use Python 3.10 slim
+FROM python:3.10-slim
 
 WORKDIR /app
 
-# Install build dependencies
+# Install system dependencies
 RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    python3-dev \
     ffmpeg \
     curl \
     git \
+    gcc \
+    g++ \
+    python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY requirements.txt .
+# Copy requirements first (for better caching)
+COPY requirements_fixed.txt .
 
-# Install Python dependencies
-RUN pip install --upgrade pip && \
-    pip install --user --no-cache-dir -r requirements.txt
+# Install Python dependencies with specific order
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir \
+    aiohttp>=3.9.3 \
+    && pip install --no-cache-dir -r requirements_fixed.txt
 
-# Runtime stage
-FROM python:3.10-slim AS runtime
+# Copy application
+COPY . .
 
-WORKDIR /app
+# Create directories
+RUN mkdir -p logs cache downloads
 
-# Install runtime dependencies
-RUN apt-get update && apt-get install -y \
-    ffmpeg \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create non-root user
-RUN useradd -m -u 1000 -s /bin/bash appuser
-
-# Copy Python dependencies from builder
-COPY --from=builder /root/.local /home/appuser/.local
-
-# Copy application code
-COPY --chown=appuser:appuser . .
-
-# Switch to non-root user
-USER appuser
-
-# Add local bin to PATH
-ENV PATH="/home/appuser/.local/bin:$PATH"
+# Set environment variables
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
-# Create necessary directories
-RUN mkdir -p logs cache downloads
+# Expose port
+EXPOSE 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Expose port
-EXPOSE 8080
-
 # Run the application
-CMD ["sh", "-c", "python bot.py & gunicorn app:app --workers 1 --worker-class uvicorn.workers.UvicornWorker --bind 0.0.0.0:$PORT --timeout 120"]
+CMD ["sh", "-c", "python bot.py"]
