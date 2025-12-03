@@ -1,0 +1,12 @@
+.env
+*.pyc
+__pycache__/
+downloads/
+*.mp3
+*.webm
+*.m4a
+*.session
+*.session-journal
+config.json
+logs/
+.DS_Store
