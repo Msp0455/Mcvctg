@@ -1,9 +1,21 @@
+# Core - Keep minimum
 pyrogram==2.0.106
 yt-dlp==2023.10.13
-youtube-search-python==1.6.5
 python-dotenv==1.0.0
-pymongo[srv]==4.4.1
+
+# APIs - Only what you have
+google-api-python-client==2.104.0
 spotipy==2.23.0
-requests==2.31.0
-ffmpeg-python==0.2.0
+lyricsgenius==3.0.1
+pylast==5.1.0
+
+# Database - MongoDB if you have
+pymongo[srv]==4.5.0
+
+# Utilities
 aiofiles==23.2.1
+requests==2.31.0
+pillow==10.1.0  # For thumbnails
+
+# FFMPEG for Render
+ffmpeg-python==0.2.0
