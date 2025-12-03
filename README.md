@@ -79,3 +79,12 @@ python start_session.py
 ```bash
 python bot.py
 ```
+6. **PyTgCalls install test**
+```bash
+pip install py-tgcalls==2.2.8
+```
+
+7. **Check if installed**
+```bash
+python -c "import pytgcalls; print(f'PyTgCalls version: {pytgcalls.__version__}')"
+```
